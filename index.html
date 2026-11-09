@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The 365</title>
+<meta name="description" content="A year of realistic daily non-negotiables.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="365">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F6F4EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1A1B19" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* A calm daily companion: greeting and ring up top, one focused card per job, iOS-style tab bar at the bottom. Sage marks progress, peach marks full marks. */
+:root{
+  --bg:#F6F4EF; --card:#FFFFFF; --ink:#2B2A27; --mute:#7A766D; --line:#E7E3DA;
+  --sage:#5F7E66; --sage-soft:#E4ECE4; --peach:#DD8C63; --peach-soft:#F8E7DB; --warn:#B9614A; --warn-soft:#F6E2DC;
+  --display:"Bricolage Grotesque","Avenir Next",-apple-system,sans-serif;
+  --body:"Figtree",-apple-system,"Segoe UI",sans-serif;
+  --r:20px; --shadow:0 1px 2px rgba(60,50,30,.05),0 8px 24px rgba(60,50,30,.06);
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#1A1B19;--card:#242622;--ink:#ECE9E2;--mute:#A39F95;--line:#34362F;--sage:#93B39A;--sage-soft:#2B3A2E;--peach:#EDB08F;--peach-soft:#3F2E24;--warn:#E08A72;--warn-soft:#3D2620;--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);color-scheme:dark;}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%}
+body{padding-top:var(--safe-t)}
+.wrap > *{min-width:0}
+.wrap{max-width:560px;margin:0 auto;padding:18px 16px calc(96px + var(--safe-b));display:grid;gap:16px}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+h2{font-size:19px;font-weight:700}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:18px}
+.card > h2 + .lede{margin-top:2px}
+.lede{color:var(--mute);font-size:14px;margin:0 0 12px}
+.small{font-size:13px;color:var(--mute)}
+.hidden{display:none !important}
+
+/* header */
+.hello{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:4px 2px}
+.hello h1{font-size:30px;font-weight:700;line-height:1.1}
+.hello p{margin:4px 0 0;color:var(--mute);font-size:15px}
+.ring{width:84px;height:84px;position:relative}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{transition:stroke-dashoffset .5s ease,stroke .3s}
+.ring .lbl{position:absolute;inset:0;display:grid;place-content:center;text-align:center;font-family:var(--display)}
+.ring .lbl b{font-size:20px;line-height:1}
+.ring .lbl small{font-size:10px;color:var(--mute);letter-spacing:.04em;text-transform:uppercase}
+.ring.pop{animation:pop .5s ease}
+@keyframes pop{50%{transform:scale(1.08)}}
+@media (prefers-reduced-motion:reduce){.ring.pop{animation:none}.ring circle{transition:none}}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:10px 12px}
+.stat .k{font-size:11px;color:var(--mute);line-height:1.2}
+.stat .v{font-family:var(--display);font-weight:700;font-size:22px;line-height:1.2}
+
+.datebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.arrow{border:0;background:var(--card);box-shadow:var(--shadow);width:36px;height:36px;border-radius:50%;font-size:18px;line-height:1}
+.arrow:disabled{opacity:.35}
+.datebar .d{font-family:var(--display);font-weight:700;font-size:19px;flex:1;min-width:0}
+.todaybtn{border:0;background:none;color:var(--sage);font-weight:700;font-size:14px;padding:6px}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--sage-soft);color:var(--sage)}
+.tag.peach{background:var(--peach-soft);color:var(--peach)} .tag.warn{background:var(--warn-soft);color:var(--warn)} .tag.grey{background:var(--line);color:var(--mute)}
+
+.note{border-radius:14px;padding:11px 14px;background:var(--sage-soft);font-size:14px}
+.note.warn{background:var(--warn-soft)} .note.peach{background:var(--peach-soft)}
+.notes{display:grid;gap:8px}
+
+/* now card */
+.now{display:grid;gap:10px}
+.nowrow{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center}
+.nowrow .when{font-family:var(--display);font-weight:700;font-size:15px;background:var(--peach-soft);color:var(--peach);border-radius:12px;padding:8px 10px;min-width:64px;text-align:center}
+.nowrow.next .when{background:var(--bg);color:var(--mute)}
+.nowrow b{display:block;font-size:16px}
+.nowrow span{font-size:13px;color:var(--mute)}
+
+/* habits */
+.habits{display:grid;gap:10px}
+.habit{border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:grid;gap:8px;transition:background .2s,border-color .2s}
+.habit.on1{border-color:var(--sage);background:color-mix(in srgb,var(--sage-soft) 55%,transparent)}
+.habit.on2{border-color:var(--peach);background:color-mix(in srgb,var(--peach-soft) 70%,transparent)}
+.habit .top{display:grid;gap:10px}
+.habit.hard{border-width:2px}
+.habit.hard h3::after{content:"Hard line";font-family:var(--body);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-left:8px;padding:2px 8px;border-radius:999px;background:var(--warn-soft);color:var(--warn);vertical-align:2px}
+.cuts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cut{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:12px 14px;display:grid;gap:2px;border:2px solid transparent}
+.cut .k{font-size:12px;color:var(--mute);font-weight:600}
+.cut b{font-family:var(--display);font-size:18px}
+.cut.soon{border-color:var(--peach);background:var(--peach-soft)}
+.cut.now{border-color:var(--warn);background:var(--warn-soft)}
+.cut.shut b{color:var(--sage)}
+.habit .top .seg{display:flex;width:100%}
+.habit .top .seg button{flex:1}
+.habit h3{font-size:16px;font-weight:700}
+.habit .why{font-size:12.5px;color:var(--mute)}
+.habit details summary{font-size:13px;color:var(--mute);cursor:pointer;list-style:none}
+.habit details summary::-webkit-details-marker{display:none}
+.habit details summary::before{content:"＋ ";color:var(--sage);font-weight:700}
+.habit details[open] summary::before{content:"－ "}
+.levels{display:grid;gap:6px;font-size:13px;margin-top:6px}
+.levels div{background:var(--bg);border-radius:10px;padding:8px 10px}
+.levels span{display:block;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.seg{display:inline-flex;background:var(--bg);border-radius:999px;padding:3px;gap:2px;flex-shrink:0}
+.seg button{border:0;background:none;border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;color:var(--mute);min-height:34px}
+.seg button[aria-pressed="true"].l0{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.seg button[aria-pressed="true"].l1{background:var(--sage);color:#fff}
+.seg button[aria-pressed="true"].l2{background:var(--peach);color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;color:var(--mute);min-height:34px}
+.chip[aria-pressed="true"]{background:var(--sage);border-color:var(--sage);color:#fff}
+
+/* timeline */
+details.tlbox > summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+details.tlbox > summary::-webkit-details-marker{display:none}
+details.tlbox > summary .chev{color:var(--mute);transition:transform .2s}
+details.tlbox[open] > summary .chev{transform:rotate(90deg)}
+.tl{list-style:none;margin:12px 0 0;padding:0}
+.tl li{display:grid;grid-template-columns:50px 14px 1fr;gap:10px;align-items:start;padding:7px 0;position:relative}
+.tl .t{font-size:13px;color:var(--mute);text-align:right;padding-top:1px}
+.tl .dot{width:12px;height:12px;border-radius:50%;margin-top:5px;border:2px solid var(--sage);background:var(--card);position:relative;z-index:1}
+.tl .dot.locked{background:var(--sage)} .tl .dot.optional{border-color:var(--line)}
+.tl li:not(:last-child)::after{content:"";position:absolute;left:66px;top:22px;bottom:-8px;width:2px;background:var(--line)}
+.tl b{font-weight:600;font-size:15px}
+.tl .kind{font-size:10.5px;font-weight:700;margin-left:6px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em}
+.tl .sub{font-size:13px;color:var(--mute)}
+.tl li.isnow{background:var(--peach-soft);border-radius:12px;margin:0 -8px;padding:7px 8px}
+.tl li.isnow::after{left:74px}
+.tl li.done b{color:var(--mute)}
+
+/* check-in */
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute)}
+.field input,.field select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%;min-height:44px}
+textarea{min-height:80px;resize:vertical}
+.scale{display:flex;gap:6px}
+.scale button{flex:1;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:9px 0;font-weight:700;min-height:42px}
+.scale button[aria-pressed="true"]{background:var(--sage);border-color:var(--sage);color:#fff}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:10px 16px;font-weight:600;min-height:44px}
+.btn.primary{background:var(--sage);border-color:var(--sage);color:#fff}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.btn:disabled{opacity:.4}
+.btn.danger{color:var(--warn)}
+
+/* week */
+.tablewrap{overflow-x:auto;margin:0 -4px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:7px 2px;text-align:center;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left;white-space:nowrap;padding-right:6px}
+thead th{color:var(--mute);font-weight:600;font-size:11.5px}
+.cell{display:inline-block;width:18px;height:18px;border-radius:6px;background:var(--bg);border:1px solid var(--line)}
+.cell.v1{background:var(--sage);border-color:var(--sage)} .cell.v2{background:var(--peach);border-color:var(--peach)}
+.targets{display:grid;gap:12px}
+.tgt{display:grid;grid-template-columns:130px 1fr 44px;gap:10px;align-items:center;font-size:14px}
+.bar{height:10px;border-radius:999px;background:var(--bg);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:999px;background:var(--sage);transition:width .4s}
+.bar.done i{background:var(--peach)}
+.tgt .num{text-align:right;color:var(--mute)}
+
+/* year */
+.year{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,13px);gap:3px;overflow-x:auto;padding-bottom:6px}
+.sq{width:13px;height:13px;border-radius:4px;background:var(--bg);border:1px solid var(--line);padding:0}
+.sq.s1{background:color-mix(in srgb,var(--sage) 35%,var(--bg));border-color:transparent}
+.sq.s3{background:var(--sage);border-color:var(--sage)}
+.sq.perfect{background:var(--peach);border-color:var(--peach)}
+.sq.miss{background:var(--warn-soft);border-color:var(--warn)}
+.sq.life{background:var(--line);border-color:var(--mute)}
+.sq.today{outline:2px solid var(--ink);outline-offset:1px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mute);align-items:center;margin-top:8px}
+.legend .sq{display:inline-block;vertical-align:-2px;margin-right:4px}
+.stats2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* setup */
+.segtabs{display:flex;gap:6px;background:var(--bg);border-radius:999px;padding:4px;margin-bottom:12px}
+.segtabs button{flex:1;border:0;background:none;border-radius:999px;padding:8px;font-weight:600;font-size:14px;color:var(--mute)}
+.segtabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.mods{display:grid;gap:10px}
+.mod{border:1px solid var(--line);border-radius:14px;padding:10px;display:grid;grid-template-columns:132px minmax(0,1fr);gap:8px;min-width:0}
+.mod input,.mod select{min-width:0;font:inherit;font-size:16px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-height:40px}
+.mod .full{grid-column:1/-1}
+.mod .acts{grid-column:1/-1;display:flex;gap:8px;justify-content:space-between;align-items:center}
+.mod .x{border:0;background:none;color:var(--warn);font-weight:600;font-size:13px}
+.weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.weekdays label{display:grid;gap:4px;text-align:center;font-size:12px;color:var(--mute)}
+.weekdays select{font:inherit;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:6px 2px;width:100%}
+.hab{display:grid;gap:6px;border:1px solid var(--line);border-radius:14px;padding:10px}
+.hab input{font:inherit;font-size:16px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%}
+.hab label{font-size:12px;color:var(--mute)}
+.steps{display:grid;gap:8px}
+.steps .stp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:center}
+.steps input{min-width:0;font:inherit;font-size:16px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%}
+
+/* bottom nav */
+nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 8px calc(6px + var(--safe-b))}
+nav.tabbar .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav.tabbar button{border:0;background:none;display:grid;justify-items:center;gap:2px;padding:6px 0;font-size:11px;font-weight:600;color:var(--mute)}
+nav.tabbar svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.tabbar button[aria-selected="true"]{color:var(--sage)}
+
+.toast{position:fixed;left:50%;bottom:calc(84px + var(--safe-b));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--card);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:30;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hello">
+    <div>
+      <h1 id="greet">Good morning, David.</h1>
+      <p id="greetSub">Day 1 of 365.</p>
+    </div>
+    <div class="ring" id="ring" aria-label="Today's progress">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--line)" stroke-width="9"/><circle id="ringArc" cx="50" cy="50" r="42" fill="none" stroke="var(--sage)" stroke-width="9" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264"/></svg>
+      <div class="lbl"><b class="num" id="ringN">0/10</b><small>today</small></div>
+    </div>
+  </header>
+
+  <!-- TODAY -->
+  <main id="view-today" style="display:grid;gap:16px">
+    <div class="datebar">
+      <button class="arrow" id="prev" aria-label="Previous day">‹</button>
+      <div class="d" id="dateLabel">Mon, Nov 9</div>
+      <button class="todaybtn hidden" id="goToday">Today</button>
+      <button class="arrow" id="next" aria-label="Next day">›</button>
+    </div>
+    <div class="tags"><span class="tag" id="typeTag">Lift day</span><span class="tag grey" id="dayPill">0 of 8 so far</span></div>
+    <div class="notes" id="alerts"></div>
+
+    <section class="cuts hidden" id="cuts" aria-label="Today's cutoffs">
+      <div class="cut" id="cutKbox"><span class="k" id="cutKt">Kitchen · 18:00</span><b id="cutK">Closes in 3h</b></div>
+      <div class="cut" id="cutDbox"><span class="k" id="cutDt">Devices · 23:30</span><b id="cutD">Off in 9h</b></div>
+    </section>
+
+    <section class="card now" id="nowCard">
+      <div class="nowrow"><div class="when" id="nowWhen">Now</div><div><b id="nowTitle">Write</b><span id="nowSub">60-minute box</span></div></div>
+      <div class="nowrow next"><div class="when" id="nextWhen">10:00</div><div><b id="nextTitle">Calls</b><span id="nextSub">Morning window</span></div></div>
+    </section>
+
+    <section class="card">
+      <h2>The ten</h2>
+      <p class="lede">Floor on a hard day, full mark when you can. <span id="needLine">9 of 10</span> and the day counts. The two hard lines are marked.</p>
+      <div class="habits" id="habits"></div>
+    </section>
+
+    <section class="card">
+      <details class="tlbox" id="tlbox" open>
+        <summary><h2>Today's shape</h2><span class="chev">›</span></summary>
+        <p class="lede" style="margin-top:6px">Filled dots are locked. Hollow dots can move. Message sweeps happen about hourly, 5 minutes each, between blocks.</p>
+        <ol class="tl" id="timeline"></ol>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Evening and the week</h2>
+      <p class="lede">These count toward your weekly targets.</p>
+      <div class="chips" id="bonus"></div>
+    </section>
+
+    <section class="card">
+      <h2>How the day felt</h2>
+      <p class="lede">Thirty seconds. This is what makes the Sunday reset useful.</p>
+      <div class="metrics">
+        <label class="field" for="mSleep">Sleep (hrs)<input id="mSleep" class="num" type="number" step="0.25" min="0" max="14" inputmode="decimal"></label>
+        <label class="field" for="mRec">WHOOP recovery %<input id="mRec" class="num" type="number" min="0" max="100" inputmode="numeric"></label>
+        <label class="field" for="mLights">Lights out last night<input id="mLights" type="time"></label>
+        <label class="field" for="mWake">Woke up at<input id="mWake" type="time"></label>
+      </div>
+      <div style="display:grid;gap:12px;margin-top:12px">
+        <div class="field">Energy today<div class="scale" id="energy" role="group" aria-label="Energy, 1 to 5"></div></div>
+        <div class="field" id="feelWrap">How the writing felt<div class="scale" id="feel" role="group" aria-label="Writing feel, 1 to 5"></div></div>
+        <label class="field" for="mNote">One line on the day<textarea id="mNote" placeholder="What worked, what slipped, and why"></textarea></label>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="lifeBtn" aria-pressed="false">Mark as a life day</button>
+        <span class="small" id="lifeInfo"></span>
+      </div>
+    </section>
+  </main>
+
+  <!-- WEEK -->
+  <main id="view-week" class="hidden" style="display:grid;gap:16px">
+    <div class="datebar">
+      <button class="arrow" id="wprev" aria-label="Previous week">‹</button>
+      <div class="d" id="weekLabel">Week 1</div>
+      <button class="arrow" id="wnext" aria-label="Next week">›</button>
+    </div>
+    <section class="stats" aria-label="Summary">
+      <div class="stat"><div class="k">Streak</div><div class="v num" id="stStreak">0</div></div>
+      <div class="stat"><div class="k">Counted</div><div class="v num" id="stCounted">0</div></div>
+      <div class="stat"><div class="k">Full marks</div><div class="v num" id="stPerfect">0</div></div>
+      <div class="stat"><div class="k">7 days</div><div class="v num" id="stScore">0%</div></div>
+    </section>
+    <section class="card"><h2>Weekly targets</h2><p class="lede">Training and people time live here, so no single day has to carry them.</p><div class="targets" id="targets"></div></section>
+    <section class="card"><h2>Day by day</h2><p class="lede">Sage is the floor, peach is the full mark.</p><div class="tablewrap"><table id="weekTable"></table></div></section>
+    <section class="card">
+      <h2>Sunday reset</h2>
+      <p class="lede">Copy this week as text and paste it to Claude for a review: what slipped, what to adjust, next week's 3 outcomes.</p>
+      <button class="btn primary" id="copyWeek">Copy this week for Claude</button>
+    </section>
+  </main>
+
+  <!-- YEAR -->
+  <main id="view-year" class="hidden" style="display:grid;gap:16px">
+    <section class="card">
+      <h2>The year</h2>
+      <p class="lede" id="yearLede">Every square is a day. Tap one to open it.</p>
+      <div class="year" id="year"></div>
+      <div class="legend">
+        <span><i class="sq"></i>Not yet</span><span><i class="sq s1"></i>Partial</span><span><i class="sq s3"></i>Counted</span>
+        <span><i class="sq perfect"></i>Full marks</span><span><i class="sq life"></i>Life day</span><span><i class="sq miss"></i>Missed</span>
+      </div>
+    </section>
+    <section class="stats2">
+      <div class="stat"><div class="k">Longest streak</div><div class="v num" id="yLong">0</div></div>
+      <div class="stat"><div class="k">Average sleep</div><div class="v num" id="ySleep">n/a</div></div>
+      <div class="stat"><div class="k">Training days</div><div class="v num" id="yTrain">0</div></div>
+      <div class="stat"><div class="k">Writing feel (avg)</div><div class="v num" id="yFeel">n/a</div></div>
+    </section>
+  </main>
+
+  <!-- SETUP -->
+  <main id="view-setup" class="hidden" style="display:grid;gap:16px">
+    <section class="card">
+      <h2>Your day templates</h2>
+      <p class="lede">Every block is a module. Change its time, rename it, mark it locked, floating, or optional, or add new ones. Changes apply to every day of that type.</p>
+      <div class="segtabs" role="tablist" id="tplTabs">
+        <button role="tab" data-tpl="lift" aria-selected="true">Lift</button>
+        <button role="tab" data-tpl="class" aria-selected="false">Class</button>
+        <button role="tab" data-tpl="weekend" aria-selected="false">Weekend</button>
+      </div>
+      <div class="mods" id="mods"></div>
+      <div class="row" style="margin-top:12px"><button class="btn" id="addMod">Add a module</button><button class="btn" id="resetTpl">Restore this template</button></div>
+    </section>
+
+    <section class="card">
+      <h2>Which day is which</h2>
+      <p class="lede">Swap a weekday's template, for example when a lift moves to Thursday.</p>
+      <div class="weekdays" id="weekdays"></div>
+    </section>
+
+    <section class="card">
+      <h2>Hard lines</h2>
+      <p class="lede">The two cutoffs that protect your sleep. They show as countdowns on Today.</p>
+      <div class="metrics">
+        <label class="field" for="kitchenTime">Kitchen closes<input id="kitchenTime" type="time"></label>
+        <label class="field" for="devBefore">Devices off before bed<select id="devBefore"><option value="60">1 hour</option><option value="75">1h 15m</option><option value="90">1h 30m</option><option value="120">2 hours</option></select></label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>The ten</h2>
+      <p class="lede">Rewrite any floor or full mark. Use {lights}, {screens}, or {kitchen} to insert those times.</p>
+      <div style="display:grid;gap:10px" id="habEdit"></div>
+      <label class="field" for="needSel" style="margin-top:12px">A day counts at
+        <select id="needSel"></select></label>
+    </section>
+
+    <section class="card">
+      <h2>Bedtime steps</h2>
+      <p class="lede">Lights-out targets and the date each one starts. Screens go off an hour before.</p>
+      <div class="steps" id="steps"></div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="addStep">Add a step</button></div>
+    </section>
+
+    <section class="card">
+      <h2>Your data</h2>
+      <p class="lede">Everything is saved on this phone. Export a backup now and then, especially before switching phones. Cloud sync comes later.</p>
+      <div class="row">
+        <button class="btn primary" id="exportBtn">Export backup</button>
+        <label class="btn" for="importFile" style="cursor:pointer">Import backup</label>
+        <input id="importFile" type="file" accept="application/json,.json" class="hidden">
+      </div>
+      <p class="small" id="storageNote" style="margin:10px 0 0"></p>
+    </section>
+
+    <section class="card">
+      <h2>Put it on your home screen</h2>
+      <p class="lede" style="margin:0">On iPhone, open this page in Safari, tap the Share button, then "Add to Home Screen". It opens full screen, with its own icon, and works offline.</p>
+    </section>
+
+    <section class="card">
+      <h2>Start over</h2>
+      <p class="lede">Clears every check-in on this phone. Export first if you might want them back.</p>
+      <button class="btn danger" id="wipeBtn">Clear all data…</button>
+      <div class="row hidden" id="wipeConfirm" style="margin-top:10px"><span class="small">Sure? This can't be undone.</span><button class="btn danger" id="wipeYes">Yes, clear it</button><button class="btn" id="wipeNo">Keep my data</button></div>
+    </section>
+  </main>
+</div>
+
+<nav class="tabbar" aria-label="Sections">
+  <div class="in" role="tablist">
+    <button role="tab" data-view="today" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Today</button>
+    <button role="tab" data-view="week" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Week</button>
+    <button role="tab" data-view="year" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="4" height="4" rx="1"/><rect x="10" y="4" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/><rect x="4" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/><rect x="16" y="10" width="4" height="4" rx="1"/><rect x="4" y="16" width="4" height="4" rx="1"/><rect x="10" y="16" width="4" height="4" rx="1"/></svg>Year</button>
+    <button role="tab" data-view="setup" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Setup</button>
+  </div>
+</nav>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
