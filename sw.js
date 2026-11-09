@@ -1,6 +1,6 @@
 // The 365 service worker: caches the app shell so it opens offline.
-const CACHE = "the365-v5";
-const SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest",
+const CACHE = "the365-v6";
+const SHELL = ["./", "./index.html", "./app.js?v=6", "./manifest.webmanifest",
   "./icons/apple-touch-icon.png", "./icons/icon-192.png", "./icons/icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -15,7 +15,7 @@ self.addEventListener("fetch", e => {
   const url = new URL(req.url);
   // App files: network first so updates land, cache as fallback for offline.
   if (url.origin === location.origin) {
-    e.respondWith(fetch(req).then(res => {
+    e.respondWith(fetch(req, { cache: "no-cache" }).then(res => {
       const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res;
     }).catch(() => caches.match(req).then(r => r || caches.match("./index.html"))));
     return;
