@@ -247,6 +247,18 @@ thead th{color:var(--mute);font-weight:600;font-size:11.5px}
 .thumbs button{flex:0 0 64px;border:0;padding:0;background:none;display:grid;gap:4px;font-size:11px;color:var(--mute)}
 .thumbs img,.thumbs .noimg{width:64px;height:84px;border-radius:10px;object-fit:cover;background:var(--bg)}
 
+.top3{display:grid;gap:8px}
+.top3 .item{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+.top3 .tick{width:28px;height:28px;border-radius:50%;border:2px solid var(--sage);background:var(--card);display:grid;place-content:center;color:#fff;font-weight:700;font-size:14px;padding:0}
+.top3 .tick[aria-pressed="true"]{background:var(--sage)}
+.top3 input{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%;min-width:0}
+.top3 .item.done input{text-decoration:line-through;color:var(--mute)}
+.night{background:var(--ink);color:var(--card)}
+.night .lede{color:color-mix(in srgb,var(--card) 70%,transparent)}
+.night h2{font-size:26px}
+.night .btn{background:transparent;color:var(--card);border-color:color-mix(in srgb,var(--card) 40%,transparent)}
+.habit .duenow{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--peach-soft);color:var(--peach);margin-left:8px;vertical-align:2px;font-family:var(--body)}
+.habit.isdone{opacity:.75}
 /* bottom nav */
 nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 8px calc(6px + var(--safe-b))}
 nav.tabbar .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
@@ -288,49 +300,71 @@ nav.tabbar button[aria-selected="true"]{color:var(--sage)}
       <div class="cut" id="cutDbox"><span class="k" id="cutDt">Devices · 23:30</span><b id="cutD">Off in 9h</b></div>
     </section>
 
+    <section class="card night hidden" id="nightCard">
+      <h2 id="nightTitle">Devices off.</h2>
+      <p class="lede" id="nightSub" style="margin:6px 0 12px">Lights out by 00:30. Everything else can wait until morning.</p>
+      <button class="btn" id="nightOpen">I need the app for a minute</button>
+    </section>
+
     <section class="card now" id="nowCard">
       <div class="nowrow"><div class="when" id="nowWhen">Now</div><div><b id="nowTitle">Write</b><span id="nowSub">60-minute box</span></div></div>
       <div class="nowrow next"><div class="when" id="nextWhen">10:00</div><div><b id="nextTitle">Calls</b><span id="nextSub">Morning window</span></div></div>
     </section>
 
-    <section class="card">
+    <section class="card" id="morningCard">
+      <h2>Morning check-in</h2>
+      <p class="lede">Before the phone takes over: last night's sleep, a weigh-in, and today's 3.</p>
+      <div class="metrics">
+        <label class="field" for="mLights"><span>Lights out last night</span><input id="mLights" type="time"></label>
+        <label class="field" for="mWake"><span>Woke up at</span><input id="mWake" type="time"></label>
+        <label class="field" for="mSleep"><span>Sleep (hrs)</span><input id="mSleep" class="num" type="number" step="0.25" min="0" max="14" inputmode="decimal"></label>
+        <label class="field" for="mRec"><span>WHOOP recovery %</span><input id="mRec" class="num" type="number" min="0" max="100" inputmode="numeric"></label>
+        <label class="field" for="tW"><span>Weight (<span class="unit">lb</span>)</span><input id="tW" class="num" type="number" step="0.1" inputmode="decimal"></label>
+        <label class="field" for="tBF"><span>Body fat %</span><input id="tBF" class="num" type="number" step="0.1" inputmode="decimal"></label>
+      </div>
+      <h3 style="font-size:15px;margin:16px 0 8px">Today's 3</h3>
+      <div class="top3" id="top3"></div>
+    </section>
+
+    <section class="card" id="liftCard">
+      <h2 id="liftTitle">Today's lift</h2>
+      <p class="lede" id="liftLede">Log it when you're back. Full details live on the Body tab.</p>
+      <div class="metrics">
+        <label class="field" for="qName"><span>Session</span><input id="qName" list="sessNames" placeholder="e.g. Upper A" autocomplete="off"></label>
+        <label class="field" for="qMins"><span>Minutes</span><input id="qMins" class="num" type="number" inputmode="numeric" placeholder="90"></label>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="qSave">Log lift</button><span class="small" id="qDone"></span></div>
+    </section>
+
+    <section class="card" id="habitsCard">
       <h2>The ten</h2>
-      <p class="lede">Floor on a hard day, full mark when you can. <span id="needLine">9 of 10</span> and the day counts. The two hard lines are marked.</p>
+      <p class="lede">Floor on a hard day, full mark when you can. <span id="needLine">9 of 10</span> and the day counts. <span id="habitOrderNote"></span></p>
       <div class="habits" id="habits"></div>
     </section>
 
-    <section class="card">
-      <details class="tlbox" id="tlbox" open>
-        <summary><h2>Today's shape</h2><span class="chev">›</span></summary>
-        <p class="lede" style="margin-top:6px">Filled dots are locked. Hollow dots can move. Message sweeps happen about hourly, 5 minutes each, between blocks.</p>
-        <ol class="tl" id="timeline"></ol>
-      </details>
-    </section>
-
-    <section class="card">
-      <h2>Evening and the week</h2>
-      <p class="lede">These count toward your weekly targets.</p>
-      <div class="chips" id="bonus"></div>
-    </section>
-
-    <section class="card">
-      <h2>How the day felt</h2>
-      <p class="lede">Thirty seconds. This is what makes the Sunday reset useful.</p>
-      <div class="metrics">
-        <label class="field" for="mSleep">Sleep (hrs)<input id="mSleep" class="num" type="number" step="0.25" min="0" max="14" inputmode="decimal"></label>
-        <label class="field" for="mRec">WHOOP recovery %<input id="mRec" class="num" type="number" min="0" max="100" inputmode="numeric"></label>
-        <label class="field" for="mLights">Lights out last night<input id="mLights" type="time"></label>
-        <label class="field" for="mWake">Woke up at<input id="mWake" type="time"></label>
-      </div>
-      <div style="display:grid;gap:12px;margin-top:12px">
+    <section class="card" id="eveningCard">
+      <h2>Close the day</h2>
+      <p class="lede">Do this at shutdown, before devices go off.</p>
+      <h3 style="font-size:15px;margin:4px 0 8px">Tomorrow's 3</h3>
+      <div class="top3" id="next3"></div>
+      <div style="display:grid;gap:12px;margin-top:14px">
         <div class="field">Energy today<div class="scale" id="energy" role="group" aria-label="Energy, 1 to 5"></div></div>
         <div class="field" id="feelWrap">How the writing felt<div class="scale" id="feel" role="group" aria-label="Writing feel, 1 to 5"></div></div>
-        <label class="field" for="mNote">One line on the day<textarea id="mNote" placeholder="What worked, what slipped, and why"></textarea></label>
+        <label class="field" for="mNote"><span>One line on the day</span><textarea id="mNote" placeholder="What worked, what slipped, and why"></textarea></label>
+        <div class="field">Evening and the week<div class="chips" id="bonus"></div></div>
       </div>
       <div class="row" style="margin-top:12px">
         <button class="btn" id="lifeBtn" aria-pressed="false">Mark as a life day</button>
         <span class="small" id="lifeInfo"></span>
       </div>
+    </section>
+
+    <section class="card" id="tlCard">
+      <details class="tlbox" id="tlbox">
+        <summary><h2>Today's shape</h2><span class="chev">›</span></summary>
+        <p class="lede" style="margin-top:6px">Filled dots are locked. Hollow dots can move. Message sweeps happen about hourly, 5 minutes each, between blocks.</p>
+        <ol class="tl" id="timeline"></ol>
+      </details>
     </section>
   </main>
 
@@ -528,6 +562,6 @@ nav.tabbar button[aria-selected="true"]{color:var(--sage)}
 </nav>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

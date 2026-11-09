@@ -109,15 +109,17 @@
     if (!S.kitchen) S.kitchen = def.kitchen;
     if (!S.devicesBefore) S.devicesBefore = def.devicesBefore;
     if (!S.unit) S.unit = "lb";
+    if (!Array.isArray(S.habits) || !S.habits.length) S.habits = def.habits;
+    const n = S.habits.length; S.need = Math.min(n, Math.max(n - 2, Number(S.need) || n - 1));
+    if (!Array.isArray(S.bedtime) || !S.bedtime.length) S.bedtime = def.bedtime;
+    S.bedtime = S.bedtime.filter(b => /^\d{4}-\d{2}-\d{2}$/.test(b.from) && /^\d{2}:\d{2}$/.test(b.time)); if (!S.bedtime.length) S.bedtime = def.bedtime;
+    ["lift", "class", "weekend"].forEach(t => { if (!Array.isArray(S.templates && S.templates[t])) S.templates[t] = def.templates[t]; S.templates[t].forEach(m => { if (["locked", "floating", "optional"].indexOf(m.kind) < 0) m.kind = "floating"; m.id = String(m.id || "m" + Math.random().toString(36).slice(2, 8)).replace(/[^\w-]/g, ""); }); });
   }
-  let saveT;
   function persist() {
-    clearTimeout(saveT);
-    saveT = setTimeout(() => {
-      try { localStorage.setItem(KEY, JSON.stringify({ v: 1, settings: S, days })); }
-      catch (_) { toast("Couldn't save on this device. Export a backup from Setup."); }
-    }, 250);
+    try { localStorage.setItem(KEY, JSON.stringify({ v: 1, settings: S, days })); }
+    catch (_) { toast("Couldn't save on this device. Export a backup from Setup."); }
   }
+  window.addEventListener("pagehide", persist);
   load();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { });
 
@@ -128,7 +130,8 @@
   const add = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
   const diff = (a, b) => Math.round((parse(b) - parse(a)) / 86400000);
   const START = () => S.start, END = () => add(S.start, TOTAL - 1);
-  let todayISO = iso(new Date());
+  const logicalToday = () => { const d = new Date(); if (d.getHours() < 5) d.setDate(d.getDate() - 1); return iso(d); };
+  let todayISO = logicalToday();
   const clamp = s => s < START() ? START() : (s > END() ? END() : s);
   const fmt = s => parse(s).toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
   const dow = s => parse(s).getDay();
@@ -169,7 +172,7 @@
   function lifeUsedInMonth(id) { const ym = id.slice(0, 7); let n = 0; for (const k in days) if (k.slice(0, 7) === ym && days[k].life) n++; return n; }
 
   // ---------- state ----------
-  let sel = clamp(todayISO), weekAnchor = sel, view = "today", tpl = "lift", lastAtLeast = -1;
+  let sel = clamp(todayISO), weekAnchor = sel, view = "today", tpl = "lift", lastAtLeast = -1, lastSelHello = null;
   const $ = id => document.getElementById(id);
 
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2200); }
@@ -184,14 +187,15 @@
     if (ev.life) line += "A life day. Rest counts too.";
     else if (ev.perfect) line += "Full marks. Enjoy that one.";
     else if (ev.counted) line += "Today counts. Anything more is a bonus.";
-    else if (ev.atLeast === 0) line += h < 5 ? "Bed is the best move right now." : "Start with the first thirty minutes.";
+    else if (ev.atLeast === 0) { const ph = sel === todayISO ? phaseNow(sel) : "other"; line += ph === "night" ? "Bed is the best move right now." : ph === "morning" ? "Start with the first thirty minutes." : ph === "evening" ? "Close the day: floors are enough." : ph === "other" ? (sel > todayISO ? "Coming up." : "Fill in what you did.") : "Tick off what's already done."; }
     else line += left + (left === 1 ? " more" : " more") + " and today counts.";
     $("greetSub").textContent = line;
     $("ringN").textContent = ev.atLeast + "/" + ev.n;
     const arc = $("ringArc"); arc.style.strokeDashoffset = 264 - 264 * Math.min(1, ev.atLeast / ev.n);
     arc.style.stroke = ev.perfect ? "var(--peach)" : "var(--sage)";
+    if (lastSelHello !== sel) lastAtLeast = -1;
     if (lastAtLeast >= 0 && ev.counted && lastAtLeast < S.need && ev.atLeast >= S.need) { const r = $("ring"); r.classList.remove("pop"); void r.offsetWidth; r.classList.add("pop"); toast("That's the day counted."); }
-    lastAtLeast = ev.atLeast;
+    lastAtLeast = ev.atLeast; lastSelHello = sel;
   }
 
   // ---------- render: today ----------
@@ -209,7 +213,7 @@
     if (todayISO < START() && sel === START()) al.push(["", "Day 1 starts " + fmt(START()) + "."]);
     if (sel > START() && y < todayISO && !evalDay(y).counted && !ev.counted) al.push(["warn", "Yesterday slipped. Never miss twice: floors are plenty today."]);
     if (e.sleep !== undefined && e.sleep !== "" && Number(e.sleep) < 6) al.push(["peach", "Under 6 hours of sleep. Lift 20 to 30% lighter, skip PRs, favour machines and dumbbells."]);
-    if (sel <= S.testEnd) al.push(["", "Morning writing test, week " + testWeek(sel) + ". Rate how the words felt at the bottom."]);
+    if (sel <= S.testEnd) al.push(["", "Morning writing test, week " + testWeek(sel) + ". Rate how the words felt in Close the day."]);
     if (sel === S.testEnd) al.push(["peach", "The writing test ends today. At the reset, compare your ratings and decide: mornings, or late nights with a hard stop."]);
     S.bedtime.forEach(b => { if (b.from === sel && b.from !== START()) al.push(["", "New bedtime from today: lights out by " + b.time + "."]); });
     $("alerts").innerHTML = al.map(a => '<div class="note ' + a[0] + '">' + esc(a[1]) + "</div>").join("");
@@ -243,22 +247,31 @@
       window._nowIdx = cur;
     } else { $("nowCard").classList.add("hidden"); window._nowIdx = -2; }
 
-    // habits
-    $("habits").innerHTML = S.habits.map(h => {
-      const v = (e.c && e.c[h.k]) || 0, vv = h.binary ? (v > 0 ? 2 : 0) : v;
+    // habits: on today, what's due now floats up and finished ones sink
+    const isToday = sel === todayISO, nmNow = nowMin();
+    const win = habitWindows(sel);
+    const order = S.habits.map((h, i) => {
+      const v = (e.c && e.c[h.k]) || 0, done = h.binary ? v > 0 : v === 2, w = win[h.k];
+      const due = isToday && !done && w && nmNow >= w[0] && nmNow < w[1];
+      const rank = !isToday ? i : done ? 300 + i : due ? i : w ? (nmNow >= w[1] ? 100 + i : 200 + (w[0] - 0) / 100) : 150 + i;
+      return { h, rank, due, done };
+    }).sort((a, b) => a.rank - b.rank);
+    $("habitOrderNote").textContent = isToday ? "What's due now is on top." : "";
+    $("habits").innerHTML = order.map(o => {
+      const h = o.h, v = (e.c && e.c[h.k]) || 0, vv = h.binary ? (v > 0 ? 2 : 0) : v;
       const opts = h.binary ? [[0, "Not yet"], [2, "Done"]] : [[0, "Not yet"], [1, "Floor"], [2, "Full"]];
       const lv = h.binary ? '<div class="levels"><div><span>Done means</span>' + esc(fill(h.full, sel)) + "</div></div>"
         : '<div class="levels"><div><span>Floor</span>' + esc(fill(h.floor, sel)) + '</div><div><span>Full mark</span>' + esc(fill(h.full, sel)) + "</div></div>";
       const ty = h.types ? '<div class="chips">' + h.types.map(x => '<button class="chip" data-type="' + x + '" aria-pressed="' + !!(e.t && e.t[x]) + '">' + x + "</button>").join("") + "</div>" : "";
-      return '<div class="habit on' + vv + (h.hard ? " hard" : "") + '"><div class="top"><div><h3>' + esc(fill(h.name, sel)) + '</h3><div class="why">' + esc(h.why) + '</div></div>' +
-        '<div class="seg" role="group" aria-label="' + esc(h.name) + '">' + opts.map(o => '<button class="l' + o[0] + '" data-h="' + h.k + '" data-v="' + o[0] + '" aria-pressed="' + (vv === o[0]) + '">' + o[1] + "</button>").join("") + "</div></div>" +
+      return '<div class="habit on' + vv + (h.hard ? " hard" : "") + (o.done && isToday ? " isdone" : "") + '"><div class="top"><div><h3>' + esc(fill(h.name, sel)) + (o.due ? '<span class="duenow">Now</span>' : "") + '</h3><div class="why">' + esc(h.why) + '</div></div>' +
+        '<div class="seg" role="group" aria-label="' + esc(fill(h.name, sel)) + '">' + opts.map(op => '<button class="l' + op[0] + '" data-h="' + h.k + '" data-v="' + op[0] + '" aria-pressed="' + (vv === op[0]) + '">' + op[1] + "</button>").join("") + "</div></div>" +
         '<details><summary>What counts</summary>' + lv + "</details>" + ty + "</div>";
     }).join("");
 
     // timeline
     $("timeline").innerHTML = mods.map((m, i) => {
       const isNow = i === window._nowIdx, done = window._nowIdx >= 0 && i < window._nowIdx;
-      return '<li class="' + (isNow ? "isnow" : "") + (done ? " done" : "") + '"><div class="t num">' + esc(m.at) + '</div><div class="dot ' + m.kind + '"></div><div><b>' + esc(m.title) + '</b><span class="kind">' + (isNow ? "Now" : m.kind) + '</span><div class="sub">' + esc(m.note) + "</div></div></li>";
+      return '<li class="' + (isNow ? "isnow" : "") + (done ? " done" : "") + '"><div class="t num">' + esc(m.at) + '</div><div class="dot ' + esc(m.kind) + '"></div><div><b>' + esc(m.title) + '</b><span class="kind">' + (isNow ? "Now" : esc(m.kind)) + '</span><div class="sub">' + esc(m.note) + "</div></div></li>";
     }).join("");
 
     // bonus
@@ -275,6 +288,80 @@
     const left = Math.max(0, 2 - lifeUsedInMonth(sel)), lb = $("lifeBtn");
     lb.setAttribute("aria-pressed", !!e.life); lb.textContent = e.life ? "Life day (tap to undo)" : "Mark as a life day"; lb.disabled = !e.life && left === 0;
     $("lifeInfo").textContent = left + " left this month, for sick days or real emergencies. Event nights are normal days.";
+
+    // morning numbers + today's 3 + tomorrow's 3
+    document.querySelectorAll(".unit").forEach(el => el.textContent = S.unit);
+    setVal("tW", e.w); setVal("tBF", e.bf);
+    renderThree("top3", sel, true);
+    renderThree("next3", add(sel, 1), false);
+
+    // quick lift card on lift days
+    const liftDay = t !== "class";
+    $("liftCard").classList.toggle("hidden", !liftDay);
+    if (liftDay) {
+      const lf = e.lift;
+      setVal("qName", lf ? lf.name : ""); setVal("qMins", lf ? lf.mins : "");
+      $("qSave").textContent = lf ? "Update lift" : "Log lift";
+      $("qDone").textContent = lf ? "Logged" + (lf.mins ? ", " + lf.mins + " min" : "") + ". Move marked full." : "";
+      $("liftTitle").textContent = t === "weekend" ? "Weekend lift" : "Today's lift";
+    }
+
+    const names = {}; Object.keys(days).forEach(k => { const l = days[k].lift; if (l && l.name) names[l.name] = 1; });
+    $("sessNames").innerHTML = Object.keys(names).map(n => '<option value="' + esc(n) + '">').join("");
+    layoutToday(e, liftDay);
+  }
+
+  // ---------- time-of-day layout ----------
+  function nowMin() { const n = new Date(); let m = n.getHours() * 60 + n.getMinutes(); if (m < 300) m += 1440; return m; }
+  function habitWindows(s) {
+    const wake = sortKey((modsFor(s)[0] || { at: "08:15" }).at), k = sortKey(S.kitchen), so = sortKey(screensOff(s)), lo = sortKey(lightsOut(s));
+    return {
+      wake: [wake - 60, wake + 120], write: [wake + 30, 720], caff: [wake, 780], move: [690, 1020], eat: [720, k],
+      kitchen: [k - 60, k + 30], shut: [k - 30, k + 60], read: [so - 30, lo], devices: [so - 60, so + 15], sleep: [so, lo + 90]
+    };
+  }
+  let nightOverride = false;
+  function phaseNow(s) {
+    const nm = nowMin(), so = sortKey(screensOff(s)), wake = sortKey((modsFor(s)[0] || { at: "08:15" }).at);
+    if (nm >= so) return "night";
+    if (nm < wake + 135) return "morning";
+    if (nm < sortKey(S.kitchen) - 60) return "day";
+    return "evening";
+  }
+  function layoutToday(e, liftDay) {
+    const ids = ["nightCard", "cuts", "nowCard", "morningCard", "liftCard", "habitsCard", "eveningCard", "tlCard"];
+    let ord;
+    const ph = sel === todayISO ? phaseNow(sel) : "other";
+    const liftLogged = !!(e && e.lift);
+    if (ph === "morning") ord = ["morningCard", "nowCard", "habitsCard", "cuts", "liftCard", "tlCard", "eveningCard"];
+    else if (ph === "day") ord = ["nowCard", "cuts"].concat(liftLogged ? [] : ["liftCard"]).concat(["habitsCard", "tlCard"]).concat(liftLogged ? ["liftCard"] : []).concat(["morningCard", "eveningCard"]);
+    else if (ph === "evening") ord = ["cuts", "eveningCard", "habitsCard", "nowCard", "tlCard", "liftCard", "morningCard"];
+    else if (ph === "night") ord = ["nightCard", "eveningCard", "habitsCard", "cuts", "morningCard", "liftCard", "tlCard", "nowCard"];
+    else ord = ["morningCard", "liftCard", "habitsCard", "eveningCard", "tlCard"];
+    ids.forEach(id => { const el = $(id); const i = ord.indexOf(id); el.style.order = i < 0 ? 99 : i + 1; });
+    // keep header bits first
+    ["alerts"].forEach(id => $(id).style.order = 0);
+    document.querySelectorAll("#view-today > .datebar, #view-today > .tags").forEach(el => el.style.order = -1);
+    // night mode: everything but the night card and evening wrap-up tucks away
+    const night = ph === "night" && !nightOverride;
+    $("nightCard").classList.toggle("hidden", ph !== "night");
+    if (ph === "night") {
+      $("nightTitle").textContent = nowMin() >= sortKey(lightsOut(sel)) ? "Past lights out." : "Devices off.";
+      $("nightSub").textContent = "Lights out by " + lightsOut(sel) + ". Everything else can wait until morning. If you haven't closed the day, do it now, quickly.";
+      $("nightOpen").classList.toggle("hidden", nightOverride);
+    }
+    ["cuts", "nowCard", "morningCard", "liftCard", "habitsCard", "tlCard"].forEach(id => { if (night) $(id).dataset.night = "1"; else delete $(id).dataset.night; });
+    document.querySelectorAll("#view-today [data-night]").forEach(el => el.style.display = "none");
+    ids.forEach(id => { if (!$(id).dataset.night) $(id).style.display = ""; });
+    if (sel !== todayISO) $("cuts").classList.add("hidden");
+    $("tlbox").open = ph === "other" ? false : $("tlbox").open;
+  }
+  function renderThree(elId, dayId, checkable) {
+    const d = days[dayId] || {}, list = (d.top3 || []).concat([{}, {}, {}]).slice(0, 3);
+    const label = checkable ? "Priority" : "Tomorrow's priority";
+    $(elId).innerHTML = list.map((it, i) => '<div class="item' + (it.done ? " done" : "") + '">' +
+      (checkable ? '<button class="tick" data-tick="' + i + '" aria-pressed="' + !!it.done + '" aria-label="Mark priority ' + (i + 1) + ' done">' + (it.done ? "✓" : "") + "</button>" : '<span class="small num" style="width:28px;text-align:center;font-weight:700">' + (i + 1) + "</span>") +
+      '<input data-three="' + dayId + '" data-i="' + i + '" value="' + esc(it.t || "") + '" placeholder="' + label + " " + (i + 1) + '" aria-label="' + label + " " + (i + 1) + '"></div>').join("");
   }
 
   // ---------- render: week ----------
@@ -355,7 +442,7 @@
     const mods = (S.templates[tpl] || []).slice().sort((a, b) => sortKey(autoAt(a.time)) - sortKey(autoAt(b.time)));
     $("mods").innerHTML = mods.map(m => {
       const auto = m.time.startsWith("@");
-      return '<div class="mod" data-id="' + m.id + '">' +
+      return '<div class="mod" data-id="' + esc(m.id) + '">' +
         (auto ? '<input value="' + ({ "@lights": "Bedtime", "@screens": "Devices off", "@kitchen": "Kitchen" }[m.time] || "Auto") + '" disabled aria-label="Time follows bedtime steps">' : '<input type="time" data-f="time" value="' + esc(m.time) + '" aria-label="Start time">') +
         '<input data-f="title" value="' + esc(m.title) + '" aria-label="Module name">' +
         '<input class="full" data-f="note" value="' + esc(m.note) + '" aria-label="Detail">' +
@@ -374,14 +461,14 @@
     $("unitSel").value = S.unit || "lb"; $("goalW").value = S.goalWeight || "";
     $("kitchenTime").value = S.kitchen; $("devBefore").value = String(S.devicesBefore);
 
-    $("steps").innerHTML = S.bedtime.map((b, i) => '<div class="stp" data-i="' + i + '"><input type="date" data-sf="from" value="' + b.from + '" aria-label="From"><input type="time" data-sf="time" value="' + b.time + '" aria-label="Lights out"><button class="btn" data-sdel="' + i + '" aria-label="Remove step">✕</button></div>').join("");
+    $("steps").innerHTML = S.bedtime.map((b, i) => '<div class="stp" data-i="' + i + '"><input type="date" data-sf="from" value="' + esc(b.from) + '" aria-label="From"><input type="time" data-sf="time" value="' + esc(b.time) + '" aria-label="Lights out"><button class="btn" data-sdel="' + i + '" aria-label="Remove step">✕</button></div>').join("");
 
     const n = Object.keys(days).length;
     $("storageNote").textContent = n + " day" + (n === 1 ? "" : "s") + " saved on this device.";
   }
 
   function renderAll() {
-    todayISO = iso(new Date());
+    todayISO = logicalToday();
     renderHello();
     if (view === "today") renderToday();
     if (view === "week") renderWeek();
@@ -392,7 +479,7 @@
 
 
   // ---------- body: weight, body fat, lifting, photos ----------
-  let wRange = 30, phAngle = null;
+  let wRange = 30, phAngle = null, bodyFormDay = null, bodyFeelDay = null;
   const fmt1 = n => (Math.round(n * 10) / 10).toFixed(1);
   const fmtS = s => parse(s).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
   function series(key, n) {
@@ -456,13 +543,15 @@
     $("liftWeek").innerHTML = wk.map(id => {
       const isPlan = dayType(id) !== "class", d = days[id] || {}, isDone = !!(d.lift || (d.t && d.t.Lift));
       if (isPlan) planned++; if (isDone) done++;
-      return '<div class="' + (isDone ? "done" : isPlan ? "plan" : "") + (id === todayISO ? " today" : "") + '"><b>' + parse(id).toLocaleDateString("en-CA", { weekday: "narrow" }) + "</b>" + (isDone ? esc((d.lift && d.lift.name) || "Lift").slice(0, 8) : isPlan ? "Lift" : dayType(id) === "class" ? "Class" : "") + "</div>";
+      return '<div class="' + (isDone ? "done" : isPlan ? "plan" : "") + (id === todayISO ? " today" : "") + '"><b>' + parse(id).toLocaleDateString("en-CA", { weekday: "narrow" }) + "</b>" + (isDone ? esc(((d.lift && d.lift.name) || "Lift").slice(0, 8)) : isPlan ? "Lift" : dayType(id) === "class" ? "Class" : "") + "</div>";
     }).join("");
     $("kL").textContent = done + "/" + planned; $("kLd").textContent = done >= planned ? "Week done" : (planned - done) + " to go";
     $("kLd").className = "d " + (done >= planned ? "down" : "");
     const lf = e.lift || {};
-    setVal("lName", lf.name); setVal("lMins", lf.mins); setVal("lNote", lf.note);
-    $("lFeel").innerHTML = [1, 2, 3, 4, 5].map(n => '<button data-lfeel="' + n + '" aria-pressed="' + (lf.feel === n) + '">' + n + "</button>").join("");
+    if (bodyFormDay !== sel) { $("lName").value = lf.name || ""; $("lMins").value = lf.mins || ""; $("lNote").value = lf.note || ""; bodyFormDay = sel; }
+    const curFeel = document.querySelector('#lFeel button[aria-pressed="true"]');
+    const feelVal = bodyFeelDay === sel && curFeel ? Number(curFeel.dataset.lfeel) : lf.feel; bodyFeelDay = sel;
+    $("lFeel").innerHTML = [1, 2, 3, 4, 5].map(n => '<button data-lfeel="' + n + '" aria-pressed="' + (feelVal === n) + '">' + n + "</button>").join("");
     $("lDay").textContent = sel === todayISO ? "today" : fmtS(sel);
     $("lDel").classList.toggle("hidden", !e.lift);
     const names = {}; Object.keys(days).forEach(k => { const l = days[k].lift; if (l && l.name) names[l.name] = 1; });
@@ -489,7 +578,7 @@
     dbP = new Promise((res, rej) => { try { const r = indexedDB.open("the365-photos", 1); r.onupgradeneeded = () => r.result.createObjectStore("photos"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (err) { rej(err); } });
     return dbP;
   }
-  const idb = (mode, fn) => photoDB().then(db => new Promise((res, rej) => { const tx = db.transaction("photos", mode), st = tx.objectStore("photos"); const r = fn(st); tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error); }));
+  const idb = (mode, fn) => photoDB().then(db => new Promise((res, rej) => { const tx = db.transaction("photos", mode), st = tx.objectStore("photos"); const r = fn(st); tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error || new Error("aborted")); }));
   const urlCache = {};
   function photoURL(key) {
     if (urlCache[key] !== undefined) return Promise.resolve(urlCache[key]);
@@ -524,7 +613,7 @@
     return new Promise((res, rej) => {
       const img = new Image(), url = URL.createObjectURL(file);
       img.onload = () => { const max = 1400, sc = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(b => b ? res(b) : rej(), "image/jpeg", 0.82); };
-      img.onerror = rej; img.src = url;
+      img.onerror = err => { URL.revokeObjectURL(url); rej(err); }; img.src = url;
     });
   }
 
@@ -560,6 +649,7 @@
   $("mods").addEventListener("change", ev => {
     const row = ev.target.closest(".mod"), f = ev.target.dataset.f; if (!row || !f) return;
     const m = S.templates[tpl].find(x => x.id === row.dataset.id); if (!m) return;
+    if (f === "time" && !/^\d{2}:\d{2}$/.test(ev.target.value)) { renderSetup(); return; }
     m[f] = ev.target.value; persist(); if (f === "time") renderSetup(); toast("Saved");
   });
   $("mods").addEventListener("click", ev => {
@@ -573,7 +663,7 @@
   $("kitchenTime").addEventListener("change", ev => { if (ev.target.value) { S.kitchen = ev.target.value; persist(); toast("Kitchen closes at " + S.kitchen); } });
   $("devBefore").addEventListener("change", ev => { S.devicesBefore = Number(ev.target.value); persist(); toast("Devices off " + S.devicesBefore + " min before bed"); });
   $("needSel").addEventListener("change", ev => { S.need = Number(ev.target.value); persist(); toast("Saved"); });
-  $("steps").addEventListener("change", ev => { const r = ev.target.closest(".stp"), f = ev.target.dataset.sf; if (!r || !f) return; S.bedtime[Number(r.dataset.i)][f] = ev.target.value; persist(); toast("Saved"); });
+  $("steps").addEventListener("change", ev => { const r = ev.target.closest(".stp"), f = ev.target.dataset.sf; if (!r || !f) return; if (!ev.target.value) { renderSetup(); return; } S.bedtime[Number(r.dataset.i)][f] = ev.target.value; persist(); toast("Saved"); });
   $("steps").addEventListener("click", ev => { const b = ev.target.closest("button[data-sdel]"); if (!b) return; if (S.bedtime.length < 2) { toast("Keep at least one bedtime"); return; } S.bedtime.splice(Number(b.dataset.sdel), 1); persist(); renderSetup(); });
   $("addStep").addEventListener("click", () => { const last = S.bedtime[S.bedtime.length - 1]; S.bedtime.push({ from: add(last ? last.from : todayISO, 7), time: last ? last.time : "23:30" }); persist(); renderSetup(); });
 
@@ -582,22 +672,48 @@
     const name = "the365-backup-" + todayISO + ".json";
     const file = new File([data], name, { type: "application/json" });
     if (navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: "The 365 backup" }).catch(() => { }); return; }
-    const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     toast("Backup saved");
   });
   $("importFile").addEventListener("change", ev => {
     const f = ev.target.files && ev.target.files[0]; if (!f) return;
     f.text().then(t => {
       const d = JSON.parse(t); if (!d || !d.days) throw new Error();
-      days = Object.assign(days, d.days); if (d.settings) S = Object.assign(defaultSettings(), d.settings);
-      persist(); renderAll(); toast("Backup imported");
+      if (typeof d.days !== "object" || Array.isArray(d.days)) throw new Error();
+      const clean = {}; Object.keys(d.days).forEach(k => { if (/^\d{4}-\d{2}-\d{2}$/.test(k) && d.days[k] && typeof d.days[k] === "object") clean[k] = Object.assign({ c: {}, t: {}, b: {} }, d.days[k]); });
+      days = Object.assign(days, clean); if (d.settings && typeof d.settings === "object") S = Object.assign(defaultSettings(), d.settings);
+      migrate(); persist(); renderAll(); toast("Backup imported: " + Object.keys(clean).length + " days");
     }).catch(() => toast("That file isn't a 365 backup."));
     ev.target.value = "";
   });
   $("wipeBtn").addEventListener("click", () => $("wipeConfirm").classList.remove("hidden"));
   $("wipeNo").addEventListener("click", () => $("wipeConfirm").classList.add("hidden"));
-  $("wipeYes").addEventListener("click", () => { days = {}; S = defaultSettings(); persist(); $("wipeConfirm").classList.add("hidden"); renderAll(); toast("Cleared"); });
+  $("wipeYes").addEventListener("click", () => { days = {}; S = defaultSettings(); persist();
+    idb("readwrite", st => st.clear()).catch(() => { }); Object.keys(urlCache).forEach(k => { if (urlCache[k]) URL.revokeObjectURL(urlCache[k]); delete urlCache[k]; }); $("wipeConfirm").classList.add("hidden"); renderAll(); toast("Cleared"); });
 
+
+  // today: morning numbers, 3s, quick lift, night
+  [["tW", "w"], ["tBF", "bf"]].forEach(([id, key]) => $(id).addEventListener("change", ev => { const e = entry(sel), v = ev.target.value; e[key] = v === "" ? "" : Number(v); persist(); toast("Saved"); }));
+  ["top3", "next3"].forEach(box => {
+    $(box).addEventListener("input", ev => {
+      const inp = ev.target.closest("input[data-three]"); if (!inp) return;
+      const e = entry(inp.dataset.three); e.top3 = (e.top3 || []).concat([{}, {}, {}]).slice(0, 3).map(x => Object.assign({}, x));
+      e.top3[Number(inp.dataset.i)].t = inp.value;
+      if (box === "next3" && e.top3.filter(x => x.t && x.t.trim()).length === 3) { const cur = entry(sel); if (!cur.c.shut) { cur.c.shut = 1; renderHello(); } }
+      persist();
+    });
+  });
+  $("top3").addEventListener("click", ev => {
+    const b = ev.target.closest("button[data-tick]"); if (!b) return;
+    const e = entry(sel); e.top3 = (e.top3 || []).concat([{}, {}, {}]).slice(0, 3).map(x => Object.assign({}, x));
+    const it = e.top3[Number(b.dataset.tick)]; it.done = !it.done; vib(); persist(); renderThree("top3", sel, true);
+  });
+  $("qSave").addEventListener("click", () => {
+    const e = entry(sel); e.lift = Object.assign({}, e.lift || {}, { name: $("qName").value.trim() || "Lift", mins: Number($("qMins").value) || "" });
+    e.t = e.t || {}; e.t.Lift = true; if (e.prevMove === undefined) e.prevMove = e.c.move || 0; if ((e.c.move || 0) < 2) e.c.move = 2;
+    persist(); vib(); renderAll(); toast("Lift logged. Move marked full.");
+  });
+  $("nightOpen").addEventListener("click", () => { nightOverride = true; renderToday(); });
 
   // body events
   [["bW", "w"], ["bBF", "bf"]].forEach(([id, key]) => $(id).addEventListener("change", ev => { const e = entry(sel), v = ev.target.value; e[key] = v === "" ? "" : Number(v); persist(); renderBody(); toast("Saved"); }));
@@ -607,10 +723,11 @@
     const e = entry(sel), fb = document.querySelector('#lFeel button[aria-pressed="true"]');
     e.lift = { name: $("lName").value.trim() || "Lift", mins: Number($("lMins").value) || "", feel: fb ? Number(fb.dataset.lfeel) : "", note: $("lNote").value.trim() };
     e.t = e.t || {}; e.t.Lift = true;
-    if (!e.c.move) e.c.move = 2;
-    persist(); vib(); renderBody(); renderHello(); toast("Session logged. Move marked full.");
+    if (e.prevMove === undefined) e.prevMove = e.c.move || 0;
+    if ((e.c.move || 0) < 2) e.c.move = 2;
+    bodyFormDay = null; persist(); vib(); renderAll(); toast("Session logged. Move marked full.");
   });
-  $("lDel").addEventListener("click", () => { const e = entry(sel); delete e.lift; if (e.t) e.t.Lift = false; persist(); renderBody(); toast("Session removed"); });
+  $("lDel").addEventListener("click", () => { const e = entry(sel); delete e.lift; if (e.t) e.t.Lift = false; if (e.prevMove !== undefined) { e.c.move = e.prevMove; delete e.prevMove; } persist(); renderAll(); toast("Session removed"); });
   $("photosNow").addEventListener("click", ev => { const b = ev.target.closest("button[data-ang]"); if (!b) return; phAngle = b.dataset.ang; $("phFile").click(); });
   $("phFile").addEventListener("change", ev => {
     const f = ev.target.files && ev.target.files[0]; ev.target.value = ""; if (!f || !phAngle) return;
@@ -620,7 +737,13 @@
   });
   ["cA", "cB", "cAng"].forEach(id => $(id).addEventListener("change", renderPhotos));
   $("thumbs").addEventListener("click", ev => { const b = ev.target.closest("button[data-cmp]"); if (!b) return; $("cB").value = b.dataset.cmp; renderPhotos(); });
-  $("unitSel").addEventListener("change", ev => { S.unit = ev.target.value; persist(); toast("Units: " + S.unit); });
+  $("unitSel").addEventListener("change", ev => {
+    const to = ev.target.value, from = S.unit || "lb"; if (to === from) return;
+    const f = to === "kg" ? 0.45359237 : 1 / 0.45359237, cv = v => Math.round(Number(v) * f * 10) / 10;
+    Object.keys(days).forEach(k => { const w = days[k].w; if (w !== undefined && w !== "" && !isNaN(w)) days[k].w = cv(w); });
+    if (S.goalWeight !== "" && S.goalWeight != null && !isNaN(S.goalWeight)) S.goalWeight = cv(S.goalWeight);
+    S.unit = to; persist(); renderSetup(); toast("Switched to " + to + ". Past weigh-ins converted.");
+  });
   $("goalW").addEventListener("change", ev => { S.goalWeight = ev.target.value; persist(); toast("Goal saved"); });
 
   // navigation
@@ -637,8 +760,9 @@
   show(["body", "week", "year", "setup"].indexOf(initial) >= 0 ? initial : "today");
 
   // keep "now" fresh, and roll over at midnight
-  setInterval(() => { const t = iso(new Date()); if (t !== todayISO && sel === todayISO) sel = clamp(t); if (view === "today") renderAll(); }, 60000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) { const t = iso(new Date()); if (t !== todayISO) sel = clamp(t); renderAll(); } });
+  function rollover() { const t = logicalToday(); if (t !== todayISO && sel === todayISO) sel = clamp(t); renderAll(); }
+  setInterval(() => { if (!document.hidden && (view === "today" || view === "body" || logicalToday() !== todayISO)) rollover(); }, 60000);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); else rollover(); });
 
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => { });
 })();

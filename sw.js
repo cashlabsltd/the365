@@ -1,6 +1,6 @@
 // The 365 service worker: caches the app shell so it opens offline.
-const CACHE = "the365-v6";
-const SHELL = ["./", "./index.html", "./app.js?v=6", "./manifest.webmanifest",
+const CACHE = "the365-v8";
+const SHELL = ["./", "./index.html", "./app.js?v=8", "./manifest.webmanifest",
   "./icons/apple-touch-icon.png", "./icons/icon-192.png", "./icons/icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -16,14 +16,15 @@ self.addEventListener("fetch", e => {
   // App files: network first so updates land, cache as fallback for offline.
   if (url.origin === location.origin) {
     e.respondWith(fetch(req, { cache: "no-cache" }).then(res => {
-      const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res;
-    }).catch(() => caches.match(req).then(r => r || caches.match("./index.html"))));
+      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+      return res;
+    }).catch(() => caches.match(req).then(r => r || (req.mode === "navigate" ? caches.match("./index.html") : Response.error()))));
     return;
   }
   // Fonts: cache first.
   if (url.hostname.includes("fonts.g")) {
     e.respondWith(caches.match(req).then(r => r || fetch(req).then(res => {
-      const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res;
+      if (res.ok || res.type === "opaque") { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return res;
     })));
   }
 });
