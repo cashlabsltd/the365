@@ -86,7 +86,7 @@
   const tplToMods = arr => arr.map((m, i) => ({ id: "m" + i + Math.random().toString(36).slice(2, 6), time: m[0], title: m[1], note: m[2], kind: m[3], only: m[4] || null }));
   function defaultSettings() {
     return {
-      name: "David", start: "2026-11-09", need: 9, testEnd: "2026-12-06", kitchen: "18:00", devicesBefore: 60,
+      name: "David", start: "2026-11-09", need: 9, testEnd: "2026-12-06", kitchen: "18:00", devicesBefore: 60, unit: "lb", goalWeight: "",
       weekMap: { 0: "weekend", 1: "lift", 2: "class", 3: "lift", 4: "class", 5: "lift", 6: "weekend" },
       templates: { lift: tplToMods(DEFAULT_TEMPLATES.lift), class: tplToMods(DEFAULT_TEMPLATES.class), weekend: tplToMods(DEFAULT_TEMPLATES.weekend) },
       habits: JSON.parse(JSON.stringify(DEFAULT_HABITS)),
@@ -108,6 +108,7 @@
     if (!S.habits.some(h => h.k === "kitchen")) { S.habits = def.habits; S.need = def.need; S.templates = def.templates; }
     if (!S.kitchen) S.kitchen = def.kitchen;
     if (!S.devicesBefore) S.devicesBefore = def.devicesBefore;
+    if (!S.unit) S.unit = "lb";
   }
   let saveT;
   function persist() {
@@ -312,6 +313,9 @@
       if (e.rec !== undefined && e.rec !== "") extra.push("recovery " + e.rec + "%");
       if (e.lights) extra.push("lights out " + e.lights);
       if (e.wake) extra.push("woke " + e.wake);
+      if (e.w) extra.push("weight " + e.w + " " + S.unit);
+      if (e.bf) extra.push("body fat " + e.bf + "%");
+      if (e.lift) extra.push("lift: " + (e.lift.name || "") + (e.lift.mins ? " " + e.lift.mins + " min" : "") + (e.lift.feel ? " felt " + e.lift.feel + "/5" : ""));
       if (e.energy) extra.push("energy " + e.energy + "/5");
       if (e.feel) extra.push("writing feel " + e.feel + "/5");
       if (extra.length) lines.push("  " + extra.join(" · "));
@@ -367,6 +371,7 @@
       '<label>' + (h.binary ? "Done means" : "Full mark") + '<input data-hf="full" value="' + esc(h.full) + '"></label></div>').join("");
     $("needSel").innerHTML = [S.habits.length - 2, S.habits.length - 1, S.habits.length].map(n => '<option value="' + n + '">' + n + " of " + S.habits.length + "</option>").join("");
     $("needSel").value = String(S.need);
+    $("unitSel").value = S.unit || "lb"; $("goalW").value = S.goalWeight || "";
     $("kitchenTime").value = S.kitchen; $("devBefore").value = String(S.devicesBefore);
 
     $("steps").innerHTML = S.bedtime.map((b, i) => '<div class="stp" data-i="' + i + '"><input type="date" data-sf="from" value="' + b.from + '" aria-label="From"><input type="time" data-sf="time" value="' + b.time + '" aria-label="Lights out"><button class="btn" data-sdel="' + i + '" aria-label="Remove step">✕</button></div>').join("");
@@ -382,6 +387,145 @@
     if (view === "week") renderWeek();
     if (view === "year") renderYear();
     if (view === "setup") renderSetup();
+    if (view === "body") renderBody();
+  }
+
+
+  // ---------- body: weight, body fat, lifting, photos ----------
+  let wRange = 30, phAngle = null;
+  const fmt1 = n => (Math.round(n * 10) / 10).toFixed(1);
+  const fmtS = s => parse(s).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
+  function series(key, n) {
+    const out = [], end = todayISO;
+    for (let i = n - 1; i >= 0; i--) {
+      const id = add(end, -i), v = days[id] && days[id][key];
+      if (v !== undefined && v !== "" && !isNaN(v)) out.push({ id, v: Number(v) });
+    }
+    return out;
+  }
+  function allSeries(key) { return Object.keys(days).sort().filter(k => days[k][key] !== undefined && days[k][key] !== "" && !isNaN(days[k][key])).map(k => ({ id: k, v: Number(days[k][key]) })); }
+  function movingAvg(pts, win) {
+    return pts.map(p => { const lo = add(p.id, -(win - 1)); const w = pts.filter(q => q.id >= lo && q.id <= p.id); return { id: p.id, v: w.reduce((a, b) => a + b.v, 0) / w.length }; });
+  }
+  function lineChart(pts, opts) {
+    if (pts.length < 2) return '<div class="empty">' + (pts.length ? "One reading so far. The chart appears after your second." : "No readings yet. Log one above and the chart starts here.") + "</div>";
+    const W = 520, H = 200, L = 38, R = 12, T = 12, B = 26;
+    const avg = movingAvg(pts, 7);
+    let vals = pts.map(p => p.v).concat(avg.map(p => p.v)); if (opts.goal) vals.push(opts.goal);
+    let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    const pad = Math.max((hi - lo) * 0.15, opts.minPad || 1); lo -= pad; hi += pad;
+    const t0 = parse(pts[0].id).getTime(), t1 = parse(pts[pts.length - 1].id).getTime(), span = Math.max(1, t1 - t0);
+    const x = id => L + (W - L - R) * (parse(id).getTime() - t0) / span, y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+    let g = "";
+    for (let i = 0; i <= 3; i++) { const v = lo + (hi - lo) * i / 3, yy = y(v); g += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '"/><text x="' + (L - 6) + '" y="' + (yy + 4) + '" text-anchor="end">' + fmt1(v) + "</text>"; }
+    g += '<text x="' + L + '" y="' + (H - 6) + '">' + fmtS(pts[0].id) + '</text><text x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end">' + fmtS(pts[pts.length - 1].id) + "</text>";
+    if (opts.goal) { const gy = y(opts.goal); g += '<line class="goal" x1="' + L + '" x2="' + (W - R) + '" y1="' + gy + '" y2="' + gy + '"/><text x="' + (W - R) + '" y="' + (gy - 5) + '" text-anchor="end" style="fill:var(--peach)">Goal ' + fmt1(opts.goal) + "</text>"; }
+    const line = avg.map((p, i) => (i ? "L" : "M") + x(p.id).toFixed(1) + " " + y(p.v).toFixed(1)).join(" ");
+    const area = line + " L" + x(avg[avg.length - 1].id).toFixed(1) + " " + (H - B) + " L" + x(avg[0].id).toFixed(1) + " " + (H - B) + " Z";
+    g += '<path class="area" d="' + area + '"/><path class="avg" d="' + line + '"/>';
+    g += pts.map(p => '<circle class="pt" r="3" cx="' + x(p.id).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '"><title>' + fmtS(p.id) + ": " + fmt1(p.v) + "</title></circle>").join("");
+    const la = avg[avg.length - 1]; g += '<circle class="last" r="5" cx="' + x(la.id).toFixed(1) + '" cy="' + y(la.v).toFixed(1) + '"/>';
+    return '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + opts.label + '">' + g + "</svg>";
+  }
+  function deltaTxt(pts, unit) {
+    if (pts.length < 2) return ["", ""];
+    const avg = movingAvg(pts, 7), now = avg[avg.length - 1].v;
+    const wk = avg.filter(p => p.id <= add(todayISO, -7)); const ref = wk.length ? wk[wk.length - 1].v : avg[0].v;
+    const d = now - ref; if (Math.abs(d) < 0.05) return ["Steady this week", ""];
+    return [(d > 0 ? "+" : "−") + fmt1(Math.abs(d)) + unit + (wk.length ? " vs last week" : " so far"), d < 0 ? "down" : "up"];
+  }
+
+  function renderBody() {
+    const e = days[sel] || {}, u = S.unit;
+    document.querySelectorAll(".unit").forEach(el => el.textContent = u);
+    const setVal = (id, val) => { const el = $(id); if (document.activeElement !== el) el.value = val == null ? "" : val; };
+    setVal("bW", e.w); setVal("bBF", e.bf);
+    $("bDate").textContent = "Logging for " + (sel === todayISO ? "today, " : "") + fmt(sel) + ". Change the day on the Today tab.";
+    const ws = series("w", 400), bs = series("bf", 400);
+    $("kW").textContent = ws.length ? fmt1(ws[ws.length - 1].v) + " " + u : "n/a";
+    let [t1, c1] = deltaTxt(ws, " " + u); $("kWd").textContent = t1; $("kWd").className = "d " + c1;
+    $("kBF").textContent = bs.length ? fmt1(bs[bs.length - 1].v) + "%" : "n/a";
+    let [t2, c2] = deltaTxt(bs, "%"); $("kBFd").textContent = t2; $("kBFd").className = "d " + c2;
+    document.querySelectorAll("#wRange button").forEach(b => b.setAttribute("aria-pressed", Number(b.dataset.r) === wRange));
+    $("wChart").innerHTML = lineChart(series("w", wRange), { goal: Number(S.goalWeight) || null, label: "Weight trend", minPad: 1 });
+    $("bfChart").innerHTML = lineChart(series("bf", 365), { label: "Body fat trend", minPad: 0.5 });
+
+    // lifting week
+    const wk = Array.from({ length: 7 }, (_, i) => add(weekStart(todayISO), i));
+    let done = 0, planned = 0;
+    $("liftWeek").innerHTML = wk.map(id => {
+      const isPlan = dayType(id) !== "class", d = days[id] || {}, isDone = !!(d.lift || (d.t && d.t.Lift));
+      if (isPlan) planned++; if (isDone) done++;
+      return '<div class="' + (isDone ? "done" : isPlan ? "plan" : "") + (id === todayISO ? " today" : "") + '"><b>' + parse(id).toLocaleDateString("en-CA", { weekday: "narrow" }) + "</b>" + (isDone ? esc((d.lift && d.lift.name) || "Lift").slice(0, 8) : isPlan ? "Lift" : dayType(id) === "class" ? "Class" : "") + "</div>";
+    }).join("");
+    $("kL").textContent = done + "/" + planned; $("kLd").textContent = done >= planned ? "Week done" : (planned - done) + " to go";
+    $("kLd").className = "d " + (done >= planned ? "down" : "");
+    const lf = e.lift || {};
+    setVal("lName", lf.name); setVal("lMins", lf.mins); setVal("lNote", lf.note);
+    $("lFeel").innerHTML = [1, 2, 3, 4, 5].map(n => '<button data-lfeel="' + n + '" aria-pressed="' + (lf.feel === n) + '">' + n + "</button>").join("");
+    $("lDay").textContent = sel === todayISO ? "today" : fmtS(sel);
+    $("lDel").classList.toggle("hidden", !e.lift);
+    const names = {}; Object.keys(days).forEach(k => { const l = days[k].lift; if (l && l.name) names[l.name] = 1; });
+    $("sessNames").innerHTML = Object.keys(names).map(n => '<option value="' + esc(n) + '">').join("");
+
+    // sessions per week, last 8 weeks
+    const weeks = Array.from({ length: 8 }, (_, i) => add(weekStart(todayISO), -7 * (7 - i)));
+    const counts = weeks.map(w0 => Array.from({ length: 7 }, (_, i) => add(w0, i)).filter(id => days[id] && (days[id].lift || (days[id].t && days[id].t.Lift))).length);
+    const BW = 520, BH = 140, bl = 24, bb = 22, bt = 10, max = Math.max(5, Math.max.apply(null, counts)), bw = (BW - bl) / 8;
+    let bars = "";
+    [0, 5].forEach(v => { const yy = bt + (BH - bt - bb) * (1 - v / max); bars += '<line class="grid" x1="' + bl + '" x2="' + BW + '" y1="' + yy + '" y2="' + yy + '"/><text x="' + (bl - 6) + '" y="' + (yy + 4) + '" text-anchor="end">' + v + "</text>"; });
+    counts.forEach((c, i) => { const h = (BH - bt - bb) * c / max, xx = bl + i * bw + bw * 0.2; bars += '<rect class="col' + (i === 7 ? " cur" : "") + '" rx="5" x="' + xx.toFixed(1) + '" y="' + (BH - bb - h).toFixed(1) + '" width="' + (bw * 0.6).toFixed(1) + '" height="' + Math.max(h, 0).toFixed(1) + '"><title>' + c + " sessions</title></rect>" + (i % 2 === 1 || i === 7 ? '<text x="' + (xx + bw * 0.3) + '" y="' + (BH - 6) + '" text-anchor="middle">' + (i === 7 ? "This wk" : fmtS(weeks[i])) + "</text>" : ""); });
+    $("liftChart").innerHTML = '<svg class="chart" viewBox="0 0 ' + BW + " " + BH + '" role="img" aria-label="Lift sessions per week">' + bars + "</svg>";
+    const log = Object.keys(days).filter(k => days[k].lift).sort().reverse().slice(0, 8);
+    $("liftLog").innerHTML = log.length ? log.map(k => { const l = days[k].lift; return '<div class="logrow"><span class="dt">' + fmtS(k) + "</span><span><b>" + esc(l.name || "Lift") + "</b>" + (l.note ? '<br><span class="small">' + esc(l.note) + "</span>" : "") + '</span><span class="small num">' + (l.mins ? l.mins + " min" : "") + (l.feel ? " · " + l.feel + "/5" : "") + "</span></div>"; }).join("") : "";
+
+    renderPhotos();
+  }
+
+  // photos in IndexedDB
+  let dbP = null;
+  function photoDB() {
+    if (dbP) return dbP;
+    dbP = new Promise((res, rej) => { try { const r = indexedDB.open("the365-photos", 1); r.onupgradeneeded = () => r.result.createObjectStore("photos"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (err) { rej(err); } });
+    return dbP;
+  }
+  const idb = (mode, fn) => photoDB().then(db => new Promise((res, rej) => { const tx = db.transaction("photos", mode), st = tx.objectStore("photos"); const r = fn(st); tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error); }));
+  const urlCache = {};
+  function photoURL(key) {
+    if (urlCache[key] !== undefined) return Promise.resolve(urlCache[key]);
+    return idb("readonly", st => st.get(key)).then(v => (urlCache[key] = v && v.blob ? URL.createObjectURL(v.blob) : null)).catch(() => null);
+  }
+  function photoKeys() { return idb("readonly", st => st.getAllKeys()).then(k => k || []).catch(() => []); }
+  const ANG = [["front", "Front"], ["side", "Side"], ["back", "Back"]];
+  function renderPhotos() {
+    const wk = weekStart(todayISO);
+    Promise.all(ANG.map(a => photoURL(wk + "|" + a[0]))).then(urls => {
+      $("photosNow").innerHTML = ANG.map((a, i) => '<button class="ph" data-ang="' + a[0] + '" aria-label="' + (urls[i] ? "Replace " : "Add ") + a[1] + ' photo">' + (urls[i] ? '<img alt="' + a[1] + ' this week" src="' + urls[i] + '"><span class="lab">' + a[1] + "</span>" : '<span class="plus">＋</span>' + a[1]) + "</button>").join("");
+      const n = urls.filter(Boolean).length;
+      $("phLede").textContent = n === 3 ? "This week's set is done. See you next week." : "This week (from " + fmtS(wk) + "): " + n + " of 3. Same spot, same light, same time.";
+    });
+    photoKeys().then(keys => {
+      const weeks = Array.from(new Set(keys.map(k => String(k).split("|")[0]))).sort();
+      const opt = (w, selW) => '<option value="' + w + '"' + (w === selW ? " selected" : "") + ">" + fmtS(w) + "</option>";
+      const a0 = $("cA").value && weeks.indexOf($("cA").value) >= 0 ? $("cA").value : weeks[0], b0 = $("cB").value && weeks.indexOf($("cB").value) >= 0 ? $("cB").value : weeks[weeks.length - 1];
+      $("cA").innerHTML = weeks.map(w => opt(w, a0)).join(""); $("cB").innerHTML = weeks.map(w => opt(w, b0)).join("");
+      const ang = $("cAng").value || "front";
+      $("cmpctl").classList.toggle("hidden", weeks.length < 2);
+      if (weeks.length < 2) $("compare").innerHTML = '<div class="empty" style="grid-column:1/-1">Compare unlocks after your second week of photos.</div>';
+      else Promise.all([photoURL(a0 + "|" + ang), photoURL(b0 + "|" + ang)]).then(u => {
+        $("compare").innerHTML = [[a0, u[0]], [b0, u[1]]].map(p => '<div class="ph">' + (p[1] ? '<img alt="" src="' + p[1] + '">' : "No " + ang + " photo") + '<span class="lab">' + fmtS(p[0]) + "</span></div>").join("");
+      });
+      Promise.all(weeks.slice().reverse().map(w => photoURL(w + "|front"))).then(u => {
+        $("thumbs").innerHTML = weeks.length ? weeks.slice().reverse().map((w, i) => '<button data-cmp="' + w + '">' + (u[i] ? '<img alt="" src="' + u[i] + '">' : '<span class="noimg"></span>') + fmtS(w) + "</button>").join("") : '<div class="empty" style="width:100%">Your weekly sets will line up here.</div>';
+      });
+    });
+  }
+  function shrink(file) {
+    return new Promise((res, rej) => {
+      const img = new Image(), url = URL.createObjectURL(file);
+      img.onload = () => { const max = 1400, sc = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); c.toBlob(b => b ? res(b) : rej(), "image/jpeg", 0.82); };
+      img.onerror = rej; img.src = url;
+    });
   }
 
   // ---------- events ----------
@@ -454,18 +598,43 @@
   $("wipeNo").addEventListener("click", () => $("wipeConfirm").classList.add("hidden"));
   $("wipeYes").addEventListener("click", () => { days = {}; S = defaultSettings(); persist(); $("wipeConfirm").classList.add("hidden"); renderAll(); toast("Cleared"); });
 
+
+  // body events
+  [["bW", "w"], ["bBF", "bf"]].forEach(([id, key]) => $(id).addEventListener("change", ev => { const e = entry(sel), v = ev.target.value; e[key] = v === "" ? "" : Number(v); persist(); renderBody(); toast("Saved"); }));
+  $("wRange").addEventListener("click", ev => { const b = ev.target.closest("button[data-r]"); if (!b) return; wRange = Number(b.dataset.r); renderBody(); });
+  $("lFeel").addEventListener("click", ev => { const b = ev.target.closest("button[data-lfeel]"); if (!b) return; document.querySelectorAll("#lFeel button").forEach(x => x.setAttribute("aria-pressed", x === b)); });
+  $("lSave").addEventListener("click", () => {
+    const e = entry(sel), fb = document.querySelector('#lFeel button[aria-pressed="true"]');
+    e.lift = { name: $("lName").value.trim() || "Lift", mins: Number($("lMins").value) || "", feel: fb ? Number(fb.dataset.lfeel) : "", note: $("lNote").value.trim() };
+    e.t = e.t || {}; e.t.Lift = true;
+    if (!e.c.move) e.c.move = 2;
+    persist(); vib(); renderBody(); renderHello(); toast("Session logged. Move marked full.");
+  });
+  $("lDel").addEventListener("click", () => { const e = entry(sel); delete e.lift; if (e.t) e.t.Lift = false; persist(); renderBody(); toast("Session removed"); });
+  $("photosNow").addEventListener("click", ev => { const b = ev.target.closest("button[data-ang]"); if (!b) return; phAngle = b.dataset.ang; $("phFile").click(); });
+  $("phFile").addEventListener("change", ev => {
+    const f = ev.target.files && ev.target.files[0]; ev.target.value = ""; if (!f || !phAngle) return;
+    const key = weekStart(todayISO) + "|" + phAngle;
+    shrink(f).then(blob => idb("readwrite", st => st.put({ blob, date: todayISO }, key))).then(() => { if (urlCache[key]) URL.revokeObjectURL(urlCache[key]); delete urlCache[key]; renderPhotos(); toast("Photo saved on this phone"); })
+      .catch(() => toast("Couldn't save that photo. Try another."));
+  });
+  ["cA", "cB", "cAng"].forEach(id => $(id).addEventListener("change", renderPhotos));
+  $("thumbs").addEventListener("click", ev => { const b = ev.target.closest("button[data-cmp]"); if (!b) return; $("cB").value = b.dataset.cmp; renderPhotos(); });
+  $("unitSel").addEventListener("change", ev => { S.unit = ev.target.value; persist(); toast("Units: " + S.unit); });
+  $("goalW").addEventListener("change", ev => { S.goalWeight = ev.target.value; persist(); toast("Goal saved"); });
+
   // navigation
   function show(v) {
     view = v;
     document.querySelectorAll("nav.tabbar button").forEach(b => b.setAttribute("aria-selected", b.dataset.view === v));
-    ["today", "week", "year", "setup"].forEach(x => $("view-" + x).classList.toggle("hidden", x !== v));
+    ["today", "body", "week", "year", "setup"].forEach(x => $("view-" + x).classList.toggle("hidden", x !== v));
     if (v === "week") weekAnchor = sel;
     if ("#" + v !== location.hash) history.replaceState(null, "", v === "today" ? location.pathname : "#" + v);
     window.scrollTo(0, 0); renderAll();
   }
   document.querySelectorAll("nav.tabbar button").forEach(b => b.addEventListener("click", () => show(b.dataset.view)));
   const initial = (location.hash || "").slice(1);
-  show(["week", "year", "setup"].indexOf(initial) >= 0 ? initial : "today");
+  show(["body", "week", "year", "setup"].indexOf(initial) >= 0 ? initial : "today");
 
   // keep "now" fresh, and roll over at midnight
   setInterval(() => { const t = iso(new Date()); if (t !== todayISO && sel === todayISO) sel = clamp(t); if (view === "today") renderAll(); }, 60000);

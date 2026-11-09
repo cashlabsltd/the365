@@ -1,5 +1,5 @@
 // The 365 service worker: caches the app shell so it opens offline.
-const CACHE = "the365-v4";
+const CACHE = "the365-v5";
 const SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest",
   "./icons/apple-touch-icon.png", "./icons/icon-192.png", "./icons/icon-512.png"];
 

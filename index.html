@@ -203,9 +203,53 @@ thead th{color:var(--mute);font-weight:600;font-size:11.5px}
 .steps .stp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:center}
 .steps input{min-width:0;font:inherit;font-size:16px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%}
 
+
+/* body */
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:10px 12px}
+.kpi .k{font-size:11px;color:var(--mute)}
+.kpi .v{font-family:var(--display);font-weight:700;font-size:22px;line-height:1.2}
+.kpi .d{font-size:12px;font-weight:600}
+.kpi .d.down{color:var(--sage)} .kpi .d.up{color:var(--peach)}
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart text{font-family:var(--body);font-size:11px;fill:var(--mute)}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .avg{fill:none;stroke:var(--sage);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.chart .area{fill:var(--sage);opacity:.12}
+.chart .pt{fill:var(--card);stroke:var(--sage);stroke-width:1.5}
+.chart .last{fill:var(--sage)}
+.chart .goal{stroke:var(--peach);stroke-dasharray:4 4;stroke-width:1.5}
+.chart .col{fill:var(--sage)} .chart .col.cur{fill:var(--peach)}
+.ranges{display:flex;gap:6px;margin:4px 0 10px}
+.ranges button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;color:var(--mute)}
+.ranges button[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.empty{font-size:14px;color:var(--mute);background:var(--bg);border-radius:12px;padding:16px;text-align:center}
+.liftweek{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.liftweek div{border-radius:12px;padding:8px 2px;background:var(--bg);font-size:12px;color:var(--mute);display:grid;gap:2px}
+.liftweek div b{font-size:13px;color:var(--ink)}
+.liftweek div.plan{border:1.5px dashed var(--sage)}
+.liftweek div.done{background:var(--sage);color:#fff;border:0} .liftweek div.done b{color:#fff}
+.liftweek div.today{outline:2px solid var(--ink);outline-offset:1px}
+.loglist{display:grid;gap:8px;margin-top:12px}
+.logrow{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font-size:14px;padding:8px 0;border-bottom:1px solid var(--line)}
+.logrow:last-child{border-bottom:0}
+.logrow .dt{font-weight:700;font-size:13px;color:var(--mute);width:58px}
+.photos3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ph{aspect-ratio:3/4;border-radius:14px;background:var(--bg);border:1.5px dashed var(--line);display:grid;place-content:center;text-align:center;font-size:13px;color:var(--mute);font-weight:600;cursor:pointer;overflow:hidden;position:relative}
+.ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ph span.lab{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 8px;border-radius:999px}
+.ph .plus{font-size:24px;line-height:1;color:var(--sage)}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.compare .ph{cursor:default;border-style:solid}
+.cmpctl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.cmpctl select{font:inherit;font-size:15px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px;width:100%;min-width:0}
+.thumbs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.thumbs button{flex:0 0 64px;border:0;padding:0;background:none;display:grid;gap:4px;font-size:11px;color:var(--mute)}
+.thumbs img,.thumbs .noimg{width:64px;height:84px;border-radius:10px;object-fit:cover;background:var(--bg)}
+
 /* bottom nav */
 nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:6px 8px calc(6px + var(--safe-b))}
-nav.tabbar .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav.tabbar .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
 nav.tabbar button{border:0;background:none;display:grid;justify-items:center;gap:2px;padding:6px 0;font-size:11px;font-weight:600;color:var(--mute)}
 nav.tabbar svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 nav.tabbar button[aria-selected="true"]{color:var(--sage)}
@@ -290,6 +334,71 @@ nav.tabbar button[aria-selected="true"]{color:var(--sage)}
     </section>
   </main>
 
+
+  <!-- BODY -->
+  <main id="view-body" class="hidden" style="display:grid;gap:16px">
+    <section class="kpis" aria-label="Body summary">
+      <div class="kpi"><div class="k">Weight</div><div class="v num" id="kW">n/a</div><div class="d" id="kWd"></div></div>
+      <div class="kpi"><div class="k">Body fat</div><div class="v num" id="kBF">n/a</div><div class="d" id="kBFd"></div></div>
+      <div class="kpi"><div class="k">Lifts this week</div><div class="v num" id="kL">0/5</div><div class="d" id="kLd"></div></div>
+    </section>
+
+    <section class="card">
+      <h2>Log today</h2>
+      <p class="lede">Same time each morning (after the bathroom, before water) for numbers you can trust.</p>
+      <div class="metrics">
+        <label class="field" for="bW"><span>Weight (<span class="unit">lb</span>)</span><input id="bW" class="num" type="number" step="0.1" inputmode="decimal"></label>
+        <label class="field" for="bBF">Body fat %<input id="bBF" class="num" type="number" step="0.1" inputmode="decimal"></label>
+      </div>
+      <p class="small" id="bDate" style="margin:8px 0 0"></p>
+    </section>
+
+    <section class="card">
+      <h2>Weight</h2>
+      <p class="lede">Dots are daily weigh-ins. The line is the 7-day average, which is the number that matters.</p>
+      <div class="ranges" id="wRange"><button data-r="30" aria-pressed="true">30 days</button><button data-r="90" aria-pressed="false">90 days</button><button data-r="365" aria-pressed="false">Year</button></div>
+      <div id="wChart"></div>
+    </section>
+
+    <section class="card">
+      <h2>Body fat</h2>
+      <p class="lede">Smart scales swing day to day, so the trend line counts more than any one reading.</p>
+      <div id="bfChart"></div>
+    </section>
+
+    <section class="card">
+      <h2>Lifting</h2>
+      <p class="lede">Planned lift days have a dashed outline and logged sessions fill in. Log the session name from your trainer's program.</p>
+      <div class="liftweek" id="liftWeek"></div>
+      <div style="display:grid;gap:10px;margin-top:14px">
+        <div class="metrics">
+          <label class="field" for="lName">Session<input id="lName" list="sessNames" placeholder="e.g. Upper A, Legs, Push" autocomplete="off"></label>
+          <label class="field" for="lMins">Minutes<input id="lMins" class="num" type="number" inputmode="numeric" placeholder="90"></label>
+        </div>
+        <datalist id="sessNames"></datalist>
+        <div class="field">How it felt<div class="scale" id="lFeel" role="group" aria-label="Session feel, 1 to 5"></div></div>
+        <label class="field" for="lNote">Note (PRs, pain, what the trainer said)<input id="lNote"></label>
+        <div class="row"><button class="btn primary" id="lSave">Log session for <span id="lDay">today</span></button><button class="btn hidden" id="lDel">Remove</button></div>
+      </div>
+      <h3 style="font-size:15px;margin:18px 0 4px">Sessions per week</h3>
+      <div id="liftChart"></div>
+      <div class="loglist" id="liftLog"></div>
+    </section>
+
+    <section class="card">
+      <h2>Progress photos</h2>
+      <p class="lede" id="phLede">Weekly, front, side, and back. Same spot, same light, same time.</p>
+      <div class="photos3" id="photosNow"></div>
+      <input type="file" id="phFile" accept="image/*" class="hidden">
+      <h3 style="font-size:15px;margin:18px 0 8px">Compare</h3>
+      <div class="cmpctl" id="cmpctl"><select id="cA" aria-label="Earlier week"></select><select id="cB" aria-label="Later week"></select><select id="cAng" aria-label="Angle"><option value="front">Front</option><option value="side">Side</option><option value="back">Back</option></select></div>
+      <div class="compare" id="compare"></div>
+      <h3 style="font-size:15px;margin:18px 0 8px">Timeline</h3>
+      <div class="thumbs" id="thumbs"></div>
+      <p class="small" style="margin:10px 0 0">Photos stay on this phone only. They're never uploaded and they aren't in the backup file.</p>
+    </section>
+  </main>
+
   <!-- WEEK -->
   <main id="view-week" class="hidden" style="display:grid;gap:16px">
     <div class="datebar">
@@ -352,6 +461,14 @@ nav.tabbar button[aria-selected="true"]{color:var(--sage)}
     </section>
 
     <section class="card">
+      <h2>Body settings</h2>
+      <div class="metrics">
+        <label class="field" for="unitSel">Units<select id="unitSel"><option value="lb">Pounds (lb)</option><option value="kg">Kilograms (kg)</option></select></label>
+        <label class="field" for="goalW">Goal weight (optional)<input id="goalW" class="num" type="number" step="0.1" inputmode="decimal"></label>
+      </div>
+    </section>
+
+    <section class="card">
       <h2>Hard lines</h2>
       <p class="lede">The two cutoffs that protect your sleep. They show as countdowns on Today.</p>
       <div class="metrics">
@@ -403,6 +520,7 @@ nav.tabbar button[aria-selected="true"]{color:var(--sage)}
 <nav class="tabbar" aria-label="Sections">
   <div class="in" role="tablist">
     <button role="tab" data-view="today" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Today</button>
+    <button role="tab" data-view="body" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 4-7 5 9"/><path d="M3 21h18"/></svg>Body</button>
     <button role="tab" data-view="week" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Week</button>
     <button role="tab" data-view="year" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="4" height="4" rx="1"/><rect x="10" y="4" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/><rect x="4" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/><rect x="16" y="10" width="4" height="4" rx="1"/><rect x="4" y="16" width="4" height="4" rx="1"/><rect x="10" y="16" width="4" height="4" rx="1"/></svg>Year</button>
     <button role="tab" data-view="setup" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Setup</button>
